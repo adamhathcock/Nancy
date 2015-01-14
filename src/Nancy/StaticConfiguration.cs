@@ -37,6 +37,12 @@ namespace Nancy
         }
 
         /// <summary>
+        /// Gets or sets a value indicating whether or not to route HEAD requests separately
+        /// </summary>
+        [Description("Disables HEAD routing and uses GET routes instead.")]
+        public static bool DisableHeadRouting { get; set; }
+
+        /// <summary>
         /// Gets or sets a value indicating whether or not to respond with 405 responses
         /// </summary>
         [Description("Disables 405 responses from being sent to the client.")]
