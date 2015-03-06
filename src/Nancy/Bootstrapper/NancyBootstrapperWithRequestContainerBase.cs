@@ -2,6 +2,7 @@ namespace Nancy.Bootstrapper
 {
     using System;
     using System.Collections.Generic;
+    using System.ComponentModel;
     using System.Linq;
 
     /// <summary>
@@ -153,7 +154,7 @@ namespace Nancy.Bootstrapper
 
             if (requestContainer == null)
             {
-                requestContainer = this.CreateRequestContainer();
+                requestContainer = this.CreateRequestContainer(context);
 
                 context.Items[this.ContextKey] = requestContainer;
 
@@ -188,8 +189,9 @@ namespace Nancy.Bootstrapper
         /// <summary>
         /// Creates a per request child/nested container
         /// </summary>
+        /// <param name="context">Current context</param>
         /// <returns>Request container instance</returns>
-        protected abstract TContainer CreateRequestContainer();
+        protected abstract TContainer CreateRequestContainer(NancyContext context);
 
         /// <summary>
         /// Register the given module types into the request container
@@ -206,7 +208,7 @@ namespace Nancy.Bootstrapper
         protected abstract IEnumerable<INancyModule> GetAllModules(TContainer container);
 
         /// <summary>
-        /// Retreive a specific module instance from the container
+        /// Retrieve a specific module instance from the container
         /// </summary>
         /// <param name="container">Container to use</param>
         /// <param name="moduleType">Type of the module</param>

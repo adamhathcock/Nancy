@@ -1,5 +1,6 @@
 namespace Nancy.ViewEngines.SuperSimpleViewEngine
 {
+    using Microsoft.CSharp.RuntimeBinder;
     using System;
     using System.Collections;
     using System.Collections.Generic;
@@ -7,6 +8,7 @@ namespace Nancy.ViewEngines.SuperSimpleViewEngine
     using System.IO;
     using System.Linq;
     using System.Reflection;
+    using System.Runtime.CompilerServices;
     using System.Text.RegularExpressions;
 
     /// <summary>
@@ -142,7 +144,7 @@ namespace Nancy.ViewEngines.SuperSimpleViewEngine
         /// </summary>
         /// <param name="model">The model.</param>
         /// <param name="propertyName">The property name to evaluate.</param>
-        /// <returns>Tuple - Item1 being a bool for whether the evaluation was sucessful, Item2 being the value.</returns>
+        /// <returns>Tuple - Item1 being a bool for whether the evaluation was successful, Item2 being the value.</returns>
         /// <exception cref="ArgumentException">Model type is not supported.</exception>
         private static Tuple<bool, object> GetPropertyValue(object model, string propertyName)
         {
@@ -161,13 +163,31 @@ namespace Nancy.ViewEngines.SuperSimpleViewEngine
                 return StandardTypePropertyEvaluator(model, propertyName);
             }
 
-            var dynamicModel = model as DynamicDictionaryValue;
-            if (dynamicModel != null)
+            if (model is DynamicDictionaryValue)
             {
+                var dynamicModel = model as DynamicDictionaryValue;
+
                 return GetPropertyValue(dynamicModel.Value, propertyName);
             }
 
+            if (model is DynamicObject)
+            {
+                return GetDynamicMember(model, propertyName);
+            }
+
             throw new ArgumentException("model must be a standard type or implement IDictionary<string, object>", "model");
+        }
+
+        private static Tuple<bool, object> GetDynamicMember(object obj, string memberName)
+        {
+            var binder = Microsoft.CSharp.RuntimeBinder.Binder.GetMember(CSharpBinderFlags.None, memberName, obj.GetType(),
+                new[] { CSharpArgumentInfo.Create(CSharpArgumentInfoFlags.None, null) });
+
+            var callsite = CallSite<Func<CallSite, object, object>>.Create(binder);
+
+            var result = callsite.Target(callsite, obj);
+
+            return result == null ? new Tuple<bool, object>(false, null) : new Tuple<bool, object>(true, result);
         }
 
         /// <summary>
@@ -175,7 +195,7 @@ namespace Nancy.ViewEngines.SuperSimpleViewEngine
         /// </summary>
         /// <param name="model">The model.</param>
         /// <param name="propertyName">The property name.</param>
-        /// <returns>Tuple - Item1 being a bool for whether the evaluation was sucessful, Item2 being the value.</returns>
+        /// <returns>Tuple - Item1 being a bool for whether the evaluation was successful, Item2 being the value.</returns>
         private static Tuple<bool, object> StandardTypePropertyEvaluator(object model, string propertyName)
         {
             var type = model.GetType();
@@ -192,7 +212,7 @@ namespace Nancy.ViewEngines.SuperSimpleViewEngine
 
             var fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static);
 
-            var field = 
+            var field =
                 fields.Where(p => string.Equals(p.Name, propertyName, StringComparison.InvariantCulture)).
                 FirstOrDefault();
 
@@ -206,7 +226,7 @@ namespace Nancy.ViewEngines.SuperSimpleViewEngine
         /// </summary>
         /// <param name="model">The model.</param>
         /// <param name="propertyName">The property name.</param>
-        /// <returns>Tuple - Item1 being a bool for whether the evaluation was sucessful, Item2 being the value.</returns>
+        /// <returns>Tuple - Item1 being a bool for whether the evaluation was successful, Item2 being the value.</returns>
         private static Tuple<bool, object> DynamicDictionaryPropertyEvaluator(object model, string propertyName)
         {
             var dictionaryModel = (IDictionary<string, object>)model;
@@ -231,7 +251,7 @@ namespace Nancy.ViewEngines.SuperSimpleViewEngine
         /// </summary>
         /// <param name="model">The model containing properties.</param>
         /// <param name="parameters">A collection of nested parameters (e.g. User, Name</param>
-        /// <returns>Tuple - Item1 being a bool for whether the evaluation was sucessful, Item2 being the value.</returns>
+        /// <returns>Tuple - Item1 being a bool for whether the evaluation was successful, Item2 being the value.</returns>
         private static Tuple<bool, object> GetPropertyValueFromParameterCollection(object model, IEnumerable<string> parameters)
         {
             if (parameters == null)
@@ -394,7 +414,7 @@ namespace Nancy.ViewEngines.SuperSimpleViewEngine
         }
 
         /// <summary>
-        /// Peforms single @Context.PropertyName substitutions.
+        /// Performs single @Context.PropertyName substitutions.
         /// </summary>
         /// <param name="template">The template.</param>
         /// <param name="model">The model.</param>
