@@ -480,6 +480,7 @@ namespace Nancy.ModelBinding
 
             if (bodyDeserializer != null)
             {
+                context.Context.Request.Body.BufferStream();
                 return bodyDeserializer.Deserialize(contentType, context.Context.Request.Body, context);
             }
 

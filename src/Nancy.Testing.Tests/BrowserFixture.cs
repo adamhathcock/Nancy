@@ -129,6 +129,7 @@ namespace Nancy.Testing.Tests
             var writer = new StreamWriter(stream);
             writer.Write(thisIsMyRequestBody);
             writer.Flush();
+            stream.Position = 0;
             // When
             var result = browser.Post("/", with =>
                                            {
@@ -296,10 +297,12 @@ namespace Nancy.Testing.Tests
             var firstRequestWriter = new StreamWriter(firstRequestStream);
             firstRequestWriter.Write(FirstRequestBody);
             firstRequestWriter.Flush();
+            firstRequestStream.Position = 0;
             var secondRequestStream = new MemoryStream();
             var secondRequestWriter = new StreamWriter(secondRequestStream);
             secondRequestWriter.Write(SecondRequestBody);
             secondRequestWriter.Flush();
+            secondRequestStream.Position = 0;
 
             // When
             var result = browser.Post("/", with =>
@@ -434,7 +437,7 @@ namespace Nancy.Testing.Tests
 
             var cookie = response.Cookies.Single(c => c.Name == FormsAuthentication.FormsAuthenticationCookieName);
             var cookieValue = HttpUtility.UrlDecode(cookie.Value);
-            
+
             //Then
             cookieValue.ShouldEqual(cookieContents);
         }
@@ -568,7 +571,7 @@ namespace Nancy.Testing.Tests
                 Get["/type"] = _ => this.Request.Url.Scheme.ToLower();
 
                 Get["/ajax"] = _ => this.Request.IsAjaxRequest() ? "ajax" : "not-ajax";
- 
+
                 Post["/encoded"] = parameters => (string)this.Request.Form.name;
 
                 Post["/encodedquerystring"] = parameters => (string)this.Request.Query.name;

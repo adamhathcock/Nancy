@@ -241,6 +241,7 @@ namespace Nancy
             var mimeType = contentType.Split(';').First();
             if (mimeType.Equals("application/x-www-form-urlencoded", StringComparison.OrdinalIgnoreCase))
             {
+                this.Body.BufferStream();
                 var reader = new StreamReader(this.Body);
                 this.form = reader.ReadToEnd().AsQueryDictionary();
                 this.Body.Position = 0;
@@ -251,6 +252,7 @@ namespace Nancy
                 return;
             }
 
+            this.Body.BufferStream();
             var boundary = Regex.Match(contentType, @"boundary=""?(?<token>[^\n\;\"" ]*)").Groups["token"].Value;
             var multipart = new HttpMultipart(this.Body, boundary);
 

@@ -63,6 +63,7 @@ namespace Nancy.Testing
             contextValues.Body = new MemoryStream();
 
             serializer.Serialize("application/json", model, contextValues.Body);
+            contextValues.Body.Position = 0;
             browserContext.Header("Content-Type", "application/json");
         }
 
@@ -85,6 +86,7 @@ namespace Nancy.Testing
             contextValues.Body = new MemoryStream();
 
             serializer.Serialize("application/xml", model, contextValues.Body);
+            contextValues.Body.Position = 0;
             browserContext.Header("Content-Type", "application/xml");
         }
 
@@ -187,7 +189,7 @@ namespace Nancy.Testing
                     if (contextValues.Headers["accept"].Any(x => x.Equals("*/*")))
                     {
                         contextValues.Headers.Remove("accept");
-                    }    
+                    }
                 }
             }
 

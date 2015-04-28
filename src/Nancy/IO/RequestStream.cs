@@ -2,7 +2,6 @@
 {
     using System;
     using System.IO;
-    using System.Threading.Tasks;
     using Nancy.Extensions;
 
     /// <summary>
@@ -14,7 +13,7 @@
 
         private bool disableStreamSwitching;
         private readonly long thresholdLength;
-        private bool isSafeToDisposeStream;
+        private bool isBuffered;
         private Stream stream;
 
         /// <summary>
@@ -45,7 +44,7 @@
         /// <param name="expectedLength">The expected length of the contents in the stream.</param>
         /// <param name="disableStreamSwitching">if set to <see langword="true"/> the stream will never explicitly be moved to disk.</param>
         public RequestStream(long expectedLength, bool disableStreamSwitching)
-            : this(null, expectedLength, DEFAULT_SWITCHOVER_THRESHOLD, disableStreamSwitching)
+            : this(new MemoryStream(), expectedLength, DEFAULT_SWITCHOVER_THRESHOLD, disableStreamSwitching)
         {
         }
 
@@ -58,53 +57,57 @@
         /// <param name="disableStreamSwitching">if set to <see langword="true"/> the stream will never explicitly be moved to disk.</param>
         public RequestStream(Stream stream, long expectedLength, long thresholdLength, bool disableStreamSwitching)
         {
+            if (stream == null)
+            {
+                throw new ArgumentNullException("stream");
+            }
             this.thresholdLength = thresholdLength;
             this.disableStreamSwitching = disableStreamSwitching;
-            this.stream = stream ?? this.CreateDefaultMemoryStream(expectedLength);
+            this.stream = stream;
 
             ThrowExceptionIfCtorParametersWereInvalid(this.stream, expectedLength, this.thresholdLength);
-
-            if (!this.MoveStreamOutOfMemoryIfExpectedLengthExceedSwitchLength(expectedLength))
-            {
-                this.MoveStreamOutOfMemoryIfContentsLengthExceedThresholdAndSwitchingIsEnabled();
-            }
-
-            if (!this.stream.CanSeek)
-            {
-                var task =
-                    MoveToWritableStream();
-
-                task.Wait();
-
-                if (task.IsFaulted)
-                {
-                   throw new InvalidOperationException("Unable to copy stream", task.Exception);
-                }
-            }
-
-            this.stream.Position = 0;
         }
 
-        private Task<object> MoveToWritableStream()
+        public void BufferStream()
         {
-            var tcs = new TaskCompletionSource<object>();
-
+            if (isBuffered)
+            {
+                //already buffered
+                return;
+            }
+            this.isBuffered = true;
             var sourceStream = this.stream;
+            var buffer = new byte[StreamExtensions.BufferSize];
+            int read = 0;
             this.stream = new MemoryStream(StreamExtensions.BufferSize);
 
-            sourceStream.CopyTo(this, (source, destination, ex) =>
+            bool bufferToDisk = false;
+            while ((read = sourceStream.Read(buffer, 0, buffer.Length)) > 0)
             {
-                if (ex != null)
+                this.stream.Write(buffer, 0, read);
+                if (!disableStreamSwitching && this.stream.Length > thresholdLength)
                 {
-                    tcs.SetException(ex);
+                    bufferToDisk = true;
+                    break;
                 }
-                else
+            }
+            this.stream.Position = 0;
+            if (bufferToDisk)
+            {
+                var fileStream = CreateTemporaryFileStream();
+                //copy the memory stream to disk
+                while ((read = this.stream.Read(buffer, 0, buffer.Length)) > 0)
                 {
-                    tcs.SetResult(null);
+                    fileStream.Write(buffer, 0, read);
                 }
-            });
-
-            return tcs.Task;
+                //now finish copying the request stream to disk
+                while ((read = sourceStream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    fileStream.Write(buffer, 0, read);
+                }
+                fileStream.Position = 0;
+                this.stream = fileStream;
+            }
         }
 
         /// <summary>
@@ -119,10 +122,10 @@
         /// <summary>
         /// Gets a value indicating whether the current stream supports seeking.
         /// </summary>
-        /// <returns>Always returns <see langword="true"/>.</returns>
+        /// <returns>Always returns <see langword="false"/>.</returns>
         public override bool CanSeek
         {
-            get { return this.stream.CanSeek; }
+            get { return false; }
         }
 
         /// <summary>
@@ -131,16 +134,16 @@
         /// <returns>Always returns <see langword="false"/>.</returns>
         public override bool CanTimeout
         {
-            get { return false; }
+            get { return this.stream.CanTimeout; }
         }
 
         /// <summary>
         /// Gets a value indicating whether the current stream supports writing.
         /// </summary>
-        /// <returns>Always returns <see langword="true"/>.</returns>
+        /// <returns>Always returns <see langword="false"/>.</returns>
         public override bool CanWrite
         {
-            get { return true; }
+            get { return false; }
         }
 
         /// <summary>
@@ -159,7 +162,7 @@
         /// <remarks>The stream is moved to disk when either the length of the contents or expected content length exceeds the threshold specified in the constructor.</remarks>
         public bool IsInMemory
         {
-            get { return !(this.stream.GetType() == typeof(FileStream)); }
+            get { return isBuffered && !(this.stream.GetType() == typeof(FileStream)); }
         }
 
         /// <summary>
@@ -211,7 +214,7 @@
 
         protected override void Dispose(bool disposing)
         {
-            if (this.isSafeToDisposeStream)
+            if (this.isBuffered)
             {
                 ((IDisposable)this.stream).Dispose();
 
@@ -243,9 +246,7 @@
         /// <param name="asyncResult">A reference to the outstanding asynchronous I/O request. </param>
         public override void EndWrite(IAsyncResult asyncResult)
         {
-            this.stream.EndWrite(asyncResult);
-
-            this.ShiftStreamToFileStreamIfNecessary();
+            throw new NotSupportedException();
         }
 
         /// <summary>
@@ -253,7 +254,7 @@
         /// </summary>
         public override void Flush()
         {
-            this.stream.Flush();
+            throw new NotSupportedException();
         }
 
         public static RequestStream FromStream(Stream stream)
@@ -310,7 +311,7 @@
         /// <param name="origin">A value of type <see cref="T:System.IO.SeekOrigin"/> indicating the reference point used to obtain the new position. </param>
         public override long Seek(long offset, SeekOrigin origin)
         {
-            return this.stream.Seek(offset, origin);
+            throw new NotSupportedException();
         }
 
         /// <summary>
@@ -332,27 +333,7 @@
         /// <param name="count">The number of bytes to be written to the current stream. </param>
         public override void Write(byte[] buffer, int offset, int count)
         {
-            this.stream.Write(buffer, offset, count);
-
-            this.ShiftStreamToFileStreamIfNecessary();
-        }
-
-        private void ShiftStreamToFileStreamIfNecessary()
-        {
-            if (this.disableStreamSwitching)
-            {
-                return;
-            }
-
-            if (this.stream.Length >= this.thresholdLength)
-            {
-                // Close the stream here as closing it every time we call
-                // MoveStreamContentsToFileStream causes an (ObjectDisposedException)
-                // in NancyWcfGenericService - webRequest.UriTemplateMatch
-                var old = this.stream;
-                this.MoveStreamContentsToFileStream();
-                old.Close();
-            }
+            throw new NotSupportedException();
         }
 
         private static FileStream CreateTemporaryFileStream()
@@ -360,20 +341,6 @@
             var filePath = Path.GetTempFileName();
 
             return new FileStream(filePath, FileMode.Create, FileAccess.ReadWrite, FileShare.None, 8192, true);
-        }
-
-        private Stream CreateDefaultMemoryStream(long expectedLength)
-        {
-            this.isSafeToDisposeStream = true;
-
-            if (this.disableStreamSwitching || expectedLength < this.thresholdLength)
-            {
-                return new MemoryStream((int)expectedLength);
-            }
-
-            this.disableStreamSwitching = true;
-
-            return CreateTemporaryFileStream();
         }
 
         private static void DeleteTemporaryFile(string fileName)
@@ -390,65 +357,6 @@
             catch
             {
             }
-        }
-
-        private void MoveStreamOutOfMemoryIfContentsLengthExceedThresholdAndSwitchingIsEnabled()
-        {
-            if (!this.stream.CanSeek)
-            {
-                return;
-            }
-
-            try
-            {
-                if ((this.stream.Length > this.thresholdLength) && !this.disableStreamSwitching)
-                {
-                    this.MoveStreamContentsToFileStream();
-                }
-            }
-            catch (NotSupportedException)
-            {
-            }
-        }
-
-        private bool MoveStreamOutOfMemoryIfExpectedLengthExceedSwitchLength(long expectedLength)
-        {
-            if ((expectedLength >= this.thresholdLength) && !this.disableStreamSwitching)
-            {
-                this.MoveStreamContentsToFileStream();
-                return true;
-            }
-            return false;
-        }
-
-        private void MoveStreamContentsToFileStream()
-        {
-            var targetStream = CreateTemporaryFileStream();
-            this.isSafeToDisposeStream = true;
-
-            if (this.stream.CanSeek && this.stream.Length == 0)
-            {
-                this.stream.Close();
-                this.stream = targetStream;
-                return;
-            }
-
-            // Seek to 0 if we can, although if we can't seek, and we've already written (if the size is unknown) then
-            // we are screwed anyway, and some streams that don't support seek also don't let you read the position so
-            // there's no real way to check :-/
-            if (this.stream.CanSeek)
-            {
-                this.stream.Position = 0;
-            }
-            this.stream.CopyTo(targetStream, 8196);
-            if (this.stream.CanSeek)
-            {
-                this.stream.Flush();
-            }
-
-            this.stream = targetStream;
-
-            this.disableStreamSwitching = true;
         }
 
         private static void ThrowExceptionIfCtorParametersWereInvalid(Stream stream, long expectedLength, long thresholdLength)

@@ -293,6 +293,7 @@ namespace Nancy.Testing
 
             var requestStream =
                 RequestStream.FromStream(contextValues.Body, 0, true);
+            requestStream.BufferStream();
 
             var certBytes = (contextValues.ClientCertificate == null) ?
                 new byte[] { } :
