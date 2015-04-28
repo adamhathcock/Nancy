@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0"?>
 <package xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <metadata xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
-    <id>Nancy.Authentication.Stateless</id>
+    <id>Nancy.Authentication.Stateless.Bim360</id>
     <version>0.0.0</version>  <!-- The real version will be added by rake -->
     <authors>Andreas Håkansson, Steven Robbins and contributors</authors>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -13,7 +13,7 @@
     <licenseUrl>https://github.com/NancyFx/Nancy/blob/master/license.txt</licenseUrl>
     <projectUrl>http://nancyfx.org</projectUrl>
     <dependencies>
-      <dependency id="Nancy" />
+      <dependency id="Nancy.Bim360" />
     </dependencies> 
     <tags>Nancy Authentication</tags>
   </metadata>
