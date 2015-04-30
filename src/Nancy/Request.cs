@@ -21,6 +21,7 @@ namespace Nancy
     {
         private readonly List<HttpFile> files = new List<HttpFile>();
         private dynamic form = new DynamicDictionary();
+        private bool parsedFormData;
 
         private IDictionary<string, string> cookies;
 
@@ -98,8 +99,6 @@ namespace Nancy
             {
                 this.Url.Path = "/";
             }
-
-            this.ParseFormData();
             this.RewriteMethod();
         }
 
@@ -207,7 +206,11 @@ namespace Nancy
         /// <value>An <see cref="IEnumerable{T}"/> instance, containing an <see cref="HttpFile"/> instance for each uploaded file.</value>
         public IEnumerable<HttpFile> Files
         {
-            get { return this.files; }
+            get
+            {
+                ParseFormData();
+                return this.files;
+            }
         }
 
         /// <summary>
@@ -217,7 +220,11 @@ namespace Nancy
         /// <remarks>Currently Nancy will only parse form data sent using the application/x-www-url-encoded mime-type.</remarks>
         public dynamic Form
         {
-            get { return this.form; }
+            get
+            {
+                ParseFormData();
+                return this.form;
+            }
         }
 
         /// <summary>
@@ -234,6 +241,10 @@ namespace Nancy
 
         private void ParseFormData()
         {
+            if (parsedFormData)
+            {
+                return;
+            }
             if (string.IsNullOrEmpty(this.Headers.ContentType))
             {
                 return;
@@ -247,6 +258,7 @@ namespace Nancy
                 var reader = new StreamReader(this.Body);
                 this.form = reader.ReadToEnd().AsQueryDictionary();
                 this.Body.Position = 0;
+                parsedFormData = true;
             }
 
             if (!mimeType.Equals("multipart/form-data", StringComparison.OrdinalIgnoreCase))
@@ -282,6 +294,7 @@ namespace Nancy
             }
 
             this.Body.Position = 0;
+            parsedFormData = true;
         }
 
         private void RewriteMethod()
