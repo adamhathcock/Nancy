@@ -307,10 +307,13 @@ namespace Nancy
             var overrides =
                 new List<Tuple<string, string>>
                 {
-                    Tuple.Create("_method form input element", (string)this.Form["_method"]),
-                    Tuple.Create("X-HTTP-Method-Override form input element", (string)this.Form["X-HTTP-Method-Override"]),
                     Tuple.Create("X-HTTP-Method-Override header", this.Headers["X-HTTP-Method-Override"].FirstOrDefault())
                 };
+            if (!StaticConfiguration.DisableXHttpMethodOverrideBodyDiscovery)
+            {
+                overrides.Add(Tuple.Create("_method form input element", (string)this.Form["_method"]));
+                overrides.Add(Tuple.Create("X-HTTP-Method-Override form input element", (string)this.Form["X-HTTP-Method-Override"]));
+            }
 
             var providedOverride =
                 overrides.Where(x => !string.IsNullOrEmpty(x.Item2))
