@@ -151,6 +151,21 @@ namespace Nancy.Tests.Unit.IO
         }
 
         [Fact]
+        public void Should_return_true_when_queried_about_supporting_seeking_if_buffered()
+        {
+            // Given
+            var stream = new ConfigurableMemoryStream();
+            var request = RequestStream.FromStream(stream, 0, 1, false);
+            request.BufferStream();
+
+            // When
+            var result = request.CanSeek;
+
+            // Then
+            result.ShouldBeTrue();
+        }
+
+        [Fact]
         public void Should_return_underlaying_stream_when_queried_about_supporting_timeout()
         {
             // Given

@@ -126,7 +126,14 @@
         /// <returns>Returns depending on whether the stream is buffered or not.</returns>
         public override bool CanSeek
         {
-            get { return this.stream.CanSeek; }
+            get
+            {
+                if (!isBuffered)
+                {
+                    return false;
+                }
+                return this.stream.CanSeek;
+            }
         }
 
         /// <summary>
@@ -312,6 +319,10 @@
         /// <param name="origin">A value of type <see cref="T:System.IO.SeekOrigin"/> indicating the reference point used to obtain the new position. </param>
         public override long Seek(long offset, SeekOrigin origin)
         {
+            if (!isBuffered)
+            {
+                throw new NotSupportedException();
+            }
             return this.stream.Seek(offset, origin);
         }
 
@@ -323,6 +334,10 @@
         /// <remarks>This functionality is not supported by the <see cref="RequestStream"/> type and will always throw <see cref="NotSupportedException"/>.</remarks>
         public override void SetLength(long value)
         {
+            if (!isBuffered)
+            {
+                throw new NotSupportedException();
+            }
             this.stream.SetLength(value);
         }
 
